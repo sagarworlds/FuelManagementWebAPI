@@ -31,6 +31,21 @@ namespace WebAPI.Data
                 return result;
             }
         }
+
+        public FuelDetail[] GetListFuelDetailByUserId(FuelDetail oFuelDetail)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                FuelDetail[] result = cnn.Query<FuelDetail>(
+                    @"SELECT *
+                    FROM FuelDetail WHERE UserId=@UserId ", oFuelDetail).ToArray();
+                return result;
+            }
+
+        }
+
+
         public User Save(User oUser)
         {
             using (var cnn = SimpleDbConnection())
@@ -56,8 +71,8 @@ namespace WebAPI.Data
                 cnn.Open();
                 oFuelDetails.Id = cnn.Query<int>(
                     @"INSERT INTO FuelDetail
-                    ( UserId, MeterReading, AddedFuel, Note, CreatedAt, ModifiedAt  ) VALUES 
-                    ( @UserId, @MeterReading, @AddedFuel, @Note, @CreatedAt, @ModifiedAt );
+                    ( UserId, MeterReading, TotalPrice, AddedFuel, Note, CreatedAt, ModifiedAt  ) VALUES 
+                    ( @UserId, @MeterReading, @TotalPrice, @AddedFuel, @Note, @CreatedAt, @ModifiedAt );
                     select last_insert_rowid()", oFuelDetails).First();
 
                 oFuelDetails = GetFuelDetailById(oFuelDetails);

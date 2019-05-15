@@ -28,8 +28,8 @@ namespace WebAPI.Controllers
         [HttpPost]
         public IHttpActionResult Save(User oUser)
         {            
-            rep.Save(oUser);            
-            return Ok();
+            var s = rep.Save(oUser);            
+            return Ok(s);
         }
 
 
