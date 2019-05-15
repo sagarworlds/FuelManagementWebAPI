@@ -20,8 +20,18 @@ namespace WebAPI.Data
             }
         }
 
-
-        public void Save(User oUser)
+        public FuelDetail GetFuelDetailById(FuelDetail oFuelDetail)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                FuelDetail result = cnn.Query<FuelDetail>(
+                    @"SELECT *
+                    FROM FuelDetail WHERE Id=@Id ", oFuelDetail).FirstOrDefault();
+                return result;
+            }
+        }
+        public User Save(User oUser)
         {
             using (var cnn = SimpleDbConnection())
             {
@@ -31,10 +41,15 @@ namespace WebAPI.Data
                     ( Email, Password, CreatedAt, ModifiedAt  ) VALUES 
                     ( @Email, @Password, @CreatedAt, @ModifiedAt );
                     select last_insert_rowid()", oUser).First();
+
+                oUser = cnn.Query<User>(
+                    @"SELECT * FROM User WHERE Id=@Id", oUser).FirstOrDefault();
+
+                return oUser;
             }
         }
-        
-        public void Save(FuelDetail oFuelDetails)
+
+        public FuelDetail Save(FuelDetail oFuelDetails)
         {
             using (var cnn = SimpleDbConnection())
             {
@@ -44,9 +59,13 @@ namespace WebAPI.Data
                     ( UserId, MeterReading, AddedFuel, Note, CreatedAt, ModifiedAt  ) VALUES 
                     ( @UserId, @MeterReading, @AddedFuel, @Note, @CreatedAt, @ModifiedAt );
                     select last_insert_rowid()", oFuelDetails).First();
+
+                oFuelDetails = GetFuelDetailById(oFuelDetails);
+                return oFuelDetails;
             }
+
         }
-        
+
         public User LogIn(User oUser)
         {
             using (var cnn = SimpleDbConnection())

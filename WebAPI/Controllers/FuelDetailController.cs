@@ -1,4 +1,5 @@
-﻿using System.Web.Http;
+﻿using System;
+using System.Web.Http;
 using WebAPI.Data;
 using WebAPI.Model;
 
@@ -23,19 +24,24 @@ namespace WebAPI.Controllers
 
             return Ok(fuelDetails);
         }
+        
 
         [HttpPost]
-        public IHttpActionResult Save(User oUser)
+        public IHttpActionResult Save(FuelDetail oFuelDetail)
         {
-            //rep.SaveUser(new User { Email = "sagarp@gmail.com", Password = "password", CreatedAt = DateTime.Now, ModifiedAt = DateTime.Now });
-            rep.Save(oUser);
-            var users = rep.GetUser();
-            if (users == null)
-            {
-                return NotFound();
-            }
+            oFuelDetail.CreatedAt = DateTime.UtcNow;
+            oFuelDetail.ModifiedAt = DateTime.UtcNow;
+            var ofuelDetail = rep.Save(oFuelDetail);            
+            return Ok(ofuelDetail);
+        }
 
-            return Ok(users);
+        [HttpPost]
+        public IHttpActionResult SaveUser(User oUser)
+        {
+            oUser.CreatedAt = DateTime.UtcNow;
+            oUser.ModifiedAt = DateTime.UtcNow;
+            var ofuelDetail = rep.Save(oUser);
+            return Ok(ofuelDetail);
         }
 
 

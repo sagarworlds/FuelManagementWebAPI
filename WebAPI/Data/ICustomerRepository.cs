@@ -6,8 +6,9 @@ namespace WebAPI.Data
     {
         User[] GetUser();
         FuelDetail[] GetListFuelDetail();
-        void Save(User oUser);
-        void Save(FuelDetail oFuelDetails);
+        FuelDetail GetFuelDetailById(FuelDetail oFuelDetail);
+        FuelDetail Save(FuelDetail oFuelDetails);
+        User Save(User oUser);
         User LogIn(User oUser);
     }
 }

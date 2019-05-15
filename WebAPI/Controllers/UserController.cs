@@ -27,16 +27,9 @@ namespace WebAPI.Controllers
 
         [HttpPost]
         public IHttpActionResult Save(User oUser)
-        {
-            //rep.SaveUser(new User { Email = "sagarp@gmail.com", Password = "password", CreatedAt = DateTime.Now, ModifiedAt = DateTime.Now });
-            rep.Save(oUser);
-            var users = rep.GetUser();
-            if (users == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(users);
+        {            
+            rep.Save(oUser);            
+            return Ok();
         }
 
 
