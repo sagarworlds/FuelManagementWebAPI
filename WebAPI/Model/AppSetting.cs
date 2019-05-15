@@ -2,7 +2,7 @@
 using System.Configuration;
 using System.Globalization;
 
-namespace WebAPI.Controllers
+namespace WebAPI.Model
 {
     public static class AppSettings
     {

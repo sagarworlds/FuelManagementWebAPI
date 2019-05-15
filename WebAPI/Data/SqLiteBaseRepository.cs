@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Data.SQLite;
-using WebAPI.Controllers;
+using WebAPI.Model;
 
 namespace WebAPI.Data
 {
