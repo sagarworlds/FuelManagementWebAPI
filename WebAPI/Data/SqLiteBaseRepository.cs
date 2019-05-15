@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data.SQLite;
+using WebAPI.Controllers;
 
 namespace WebAPI.Data
 {
@@ -9,7 +10,7 @@ namespace WebAPI.Data
         {
             get
             {
-                return AppDomain.CurrentDomain.BaseDirectory + ("/App_data/SimpleDb.sqlite");
+                return AppDomain.CurrentDomain.BaseDirectory + (AppSettings.DbConnection);
             }
         }
 
