@@ -56,8 +56,8 @@ namespace WebAPI.Controllers
         [HttpPost]
         public IHttpActionResult Save(FuelDetail oFuelDetail)
         {
-            oFuelDetail.CreatedAt = DateTime.UtcNow;
-            oFuelDetail.ModifiedAt = DateTime.UtcNow;
+            ///oFuelDetail.CreatedAt = DateTime.UtcNow;
+            oFuelDetail.ModifiedAt = oFuelDetail.CreatedAt;
             var ofuelDetail = rep.Save(oFuelDetail);
             return Ok(ofuelDetail);
         }
