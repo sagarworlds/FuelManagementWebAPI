@@ -10,7 +10,7 @@ A lightweight and robust backend service designed to track fuel logs, manage use
 
 ## 🚀 Features
 
-- **User Management**: Simple registration, and login that issues a JWT bearer token.
+- **User Management**: Registration, login that issues a JWT bearer token, and password changes. Passwords are stored as bcrypt hashes and never returned by the API.
 - **Per-user data**: Every fuel endpoint requires a token and only reads or writes the signed-in user's entries.
 - **Fuel Tracking**: Record details such as odometer reading (meter reading), total price, fuel added, and personalized notes.
 - **Robust Storage**: Uses SQLite for localized, file-based database storage.
@@ -25,6 +25,7 @@ A lightweight and robust backend service designed to track fuel logs, manage use
 - **Database**: SQLite
 - **Data Access**: Dapper (Micro-ORM)
 - **Authentication**: JWT bearer tokens (HMAC-SHA256, `System.IdentityModel.Tokens.Jwt`)
+- **Password hashing**: bcrypt (`BCrypt.Net-Next`, cost 12, SHA-384 pre-hash so long passwords aren't truncated)
 - **Tests**: NUnit 3
 - **Language**: C#
 
@@ -36,7 +37,7 @@ A lightweight and robust backend service designed to track fuel logs, manage use
 FuelManagementWebAPI/
 ├── FuelManagementWebAPI.sln  # Visual Studio Solution file
 └── WebAPI/                   # Main Web API Project
-    ├── App_Data/             # Local SQLite database files (SimpleDb.sqlite)
+    ├── App_Data/             # SQLite database (SimpleDb.sqlite), created on first start; not in git
     ├── App_Start/            # Routing, CORS, auth filters (WebApiConfig.cs) and controller wiring (CompositionRoot.cs)
     ├── Auth/                 # JWT issuing/validation and the bearer-token authentication filter
     ├── Controllers/          # API Controllers (UserController, FuelDetailController)
@@ -75,7 +76,7 @@ Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `J
   }
   ```
 * **Validation**: `Email` must be a valid address; `Password` must be 8–100 characters.
-* **Response**: `200 OK` with the registered user, including `Id` and timestamps (set by the server); `400 Bad Request` with the validation errors; `409 Conflict` if the email is already registered (ignoring letter case).
+* **Response**: `200 OK` with the registered user's `Id`, `Email` and timestamps (set by the server), never the password; `400 Bad Request` with the validation errors; `409 Conflict` if the email is already registered (ignoring letter case).
 
 #### 2. User Login
 * **URL**: `POST api/user/login`
@@ -97,9 +98,18 @@ Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `J
   }
   ```
 
-#### 3. List All Users
-* **URL**: `GET api/user/get` (requires a token)
-* **Response**: An array of registered users.
+#### 3. Change Password
+* **URL**: `POST api/user/changepassword` (requires a token)
+* **Request Body**:
+  ```json
+  {
+    "CurrentPassword": "SecurePassword123",
+    "NewPassword": "EvenMoreSecure456"
+  }
+  ```
+* **Response**: `204 No Content` on success; `400 Bad Request` if the current password is wrong or the new one isn't 8–100 characters. Tokens issued before the change stay valid until they expire.
+
+> The old `GET api/user/get`, which listed every user with their password, has been removed.
 
 ---
 
@@ -148,7 +158,7 @@ All fuel endpoints require a token and act on the signed-in user's entries only.
 3. **.NET Framework 4.5**
 
 ### Database Setup
-The application is preconfigured to use a local SQLite database file:
+The application uses a local SQLite database file:
 - Located at: `WebAPI/App_Data/SimpleDb.sqlite`
 - The path is configured in `Web.config`:
   ```xml
@@ -156,6 +166,8 @@ The application is preconfigured to use a local SQLite database file:
     <add key="DbConnection" value="/App_data/SimpleDb.sqlite" />
   </appSettings>
   ```
+- **It is not in source control**, because it holds user data. On start, the API creates the file and its tables if they're missing. It also hashes any passwords still stored as plain text by earlier versions, so existing users keep their passwords.
+- **Publishing excludes `App_Data`** (`ExcludeApp_Data` in the publish profile), so deploying never overwrites the server's database. When copying a build to the server, don't replace its `App_Data` folder either.
 
 ### JWT Secret Setup
 Login tokens are signed with a secret that is kept out of source control:

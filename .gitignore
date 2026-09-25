@@ -154,6 +154,11 @@ PublishScripts/
 # Local secrets (see WebAPI/Secrets.config.example)
 WebAPI/Secrets.config
 
+# The SQLite database holds user data; the API creates it on first start.
+WebAPI/App_Data/*.sqlite
+WebAPI/App_Data/*.sqlite3
+WebAPI/App_Data/*.sqlite-journal
+
 # NuGet Packages
 *.nupkg
 # The packages folder can be ignored because of Package Restore

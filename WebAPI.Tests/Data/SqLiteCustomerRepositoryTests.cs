@@ -10,7 +10,7 @@ namespace WebAPI.Tests.Data
 {
     /// <summary>
     /// Runs the real repository against a fresh SQLite database (the DbConnection setting in App.config),
-    /// created with the same schema as App_Data/SimpleDb.sqlite.
+    /// created by <see cref="SqLiteSchema.EnsureCreated"/> as on the API's first start.
     /// </summary>
     [TestFixture]
     public class SqLiteCustomerRepositoryTests
@@ -27,9 +27,7 @@ namespace WebAPI.Tests.Data
                 File.Delete(file);
             }
 
-            Execute(
-                "CREATE TABLE User (Id INTEGER PRIMARY KEY AUTOINCREMENT, Email VARCHAR, Password VARCHAR, CreatedAt DATETIME, ModifiedAt DATETIME)",
-                "CREATE TABLE FuelDetail (Id INTEGER PRIMARY KEY AUTOINCREMENT, UserId INTEGER, MeterReading INTEGER, TotalPrice DOUBLE, AddedFuel DOUBLE, CreatedAt DATETIME, ModifiedAt DATETIME, Note VARCHAR)");
+            SqLiteSchema.EnsureCreated();
             repository = new SqLiteCustomerRepository();
         }
 
@@ -74,6 +72,41 @@ namespace WebAPI.Tests.Data
             var entries = repository.GetListFuelDetailByUserId(new FuelDetail { UserId = 2 });
 
             Assert.That(entries.Select(e => e.MeterReading), Is.EqualTo(new[] { 2000 }));
+        }
+
+        [Test]
+        public void EnsureCreated_KeepsExistingData()
+        {
+            repository.Save(new FuelDetail { UserId = 1, MeterReading = 1000, CreatedAt = DateTime.UtcNow });
+
+            SqLiteSchema.EnsureCreated();
+
+            Assert.That(repository.GetListFuelDetailByUserId(new FuelDetail { UserId = 1 }), Has.Length.EqualTo(1));
+        }
+
+        [Test]
+        public void UsersAreFoundByEmailIgnoringCase_AndById()
+        {
+            var saved = repository.Save(new User { Email = "one@example.com", Password = "hash", CreatedAt = DateTime.UtcNow });
+
+            Assert.That(repository.GetUserByEmail("ONE@example.com").Id, Is.EqualTo(saved.Id));
+            Assert.That(repository.GetUserByEmail("two@example.com"), Is.Null);
+            Assert.That(repository.GetUserById(saved.Id).Email, Is.EqualTo("one@example.com"));
+            Assert.That(repository.GetUserById(saved.Id + 1), Is.Null);
+        }
+
+        [Test]
+        public void UpdatePassword_ReplacesOnlyThatUsersPassword()
+        {
+            var one = repository.Save(new User { Email = "one@example.com", Password = "old-one", CreatedAt = DateTime.UtcNow });
+            var two = repository.Save(new User { Email = "two@example.com", Password = "old-two", CreatedAt = DateTime.UtcNow });
+            var modifiedAt = new DateTime(2026, 2, 1, 12, 0, 0, DateTimeKind.Utc);
+
+            repository.UpdatePassword(one.Id, "new-one", modifiedAt);
+
+            Assert.That(repository.GetUserById(one.Id).Password, Is.EqualTo("new-one"));
+            Assert.That(repository.GetUserById(one.Id).ModifiedAt, Is.EqualTo(modifiedAt));
+            Assert.That(repository.GetUserById(two.Id).Password, Is.EqualTo("old-two"));
         }
 
         [Test]

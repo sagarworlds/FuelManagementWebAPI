@@ -11,11 +11,13 @@ namespace WebAPI.Controllers
     {
         ICustomerRepository rep;
         readonly ITokenService tokenService;
+        readonly IPasswordHasher passwordHasher;
 
         /// <param name="rep">Reads and stores users.</param>
         /// <param name="tokenService">Issues bearer tokens on login.</param>
-        /// <exception cref="ArgumentNullException">When either argument is null.</exception>
-        public UserController(ICustomerRepository rep, ITokenService tokenService)
+        /// <param name="passwordHasher">Hashes and checks passwords.</param>
+        /// <exception cref="ArgumentNullException">When any argument is null.</exception>
+        public UserController(ICustomerRepository rep, ITokenService tokenService, IPasswordHasher passwordHasher)
         {
             if (rep == null)
             {
@@ -25,27 +27,19 @@ namespace WebAPI.Controllers
             {
                 throw new ArgumentNullException("tokenService");
             }
+            if (passwordHasher == null)
+            {
+                throw new ArgumentNullException("passwordHasher");
+            }
             this.rep = rep;
             this.tokenService = tokenService;
-        }
-
-
-        [HttpGet]
-        public IHttpActionResult Get()
-        {
-            var users = rep.GetUser();
-            if (users == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(users);
+            this.passwordHasher = passwordHasher;
         }
 
         /// <summary>
-        /// Registers a user.
+        /// Registers a user; the password is stored as a bcrypt hash.
         /// </summary>
-        /// <returns>200 with the new user; 400 when the email or password is invalid; 409 when the email is taken.</returns>
+        /// <returns>200 with the new user (without password); 400 when the email or password is invalid; 409 when the email is taken.</returns>
         [AllowAnonymous]
         [HttpPost]
         public IHttpActionResult Save(User oUser)
@@ -63,10 +57,11 @@ namespace WebAPI.Controllers
                 return Content(HttpStatusCode.Conflict, "An account with this email already exists.");
             }
 
+            oUser.Password = passwordHasher.Hash(oUser.Password);
             oUser.CreatedAt = DateTime.UtcNow;
             oUser.ModifiedAt = oUser.CreatedAt;
             var s = rep.Save(oUser);
-            return Ok(s);
+            return Ok(UserResponse.From(s));
         }
 
 
@@ -84,9 +79,10 @@ namespace WebAPI.Controllers
                 return BadRequest("Email and password are required.");
             }
 
-            var user = rep.LogIn(oUser);
+            var user = string.IsNullOrEmpty(oUser.Email) ? null : rep.GetUserByEmail(oUser.Email);
 
-            if (user == null)
+            // Checked even when the email is unknown (against a dummy hash), so both cases take as long.
+            if (!passwordHasher.Verify(oUser.Password, user == null ? null : user.Password))
             {
                 return Unauthorized();
             }
@@ -99,6 +95,40 @@ namespace WebAPI.Controllers
                 UserId = user.Id,
                 Email = user.Email
             });
+        }
+
+        /// <summary>
+        /// Changes the signed-in user's password. Tokens issued earlier stay valid until they expire.
+        /// </summary>
+        /// <returns>
+        /// 204 on success; 400 when the new password is invalid or the current one is wrong (not 401,
+        /// which clients treat as an expired session).
+        /// </returns>
+        [HttpPost]
+        public IHttpActionResult ChangePassword(ChangePasswordRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest("CurrentPassword and NewPassword are required.");
+            }
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var user = rep.GetUserById(User.GetUserId());
+            if (user == null)
+            {
+                // The token belongs to a user that no longer exists.
+                return Unauthorized();
+            }
+            if (!passwordHasher.Verify(request.CurrentPassword, user.Password))
+            {
+                return BadRequest("The current password is incorrect.");
+            }
+
+            rep.UpdatePassword(user.Id, passwordHasher.Hash(request.NewPassword), DateTime.UtcNow);
+            return StatusCode(HttpStatusCode.NoContent);
         }
 
     }

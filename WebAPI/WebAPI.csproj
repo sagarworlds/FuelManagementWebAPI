@@ -51,6 +51,9 @@
       <HintPath>..\packages\Antlr.3.5.0.2\lib\Antlr3.Runtime.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="BCrypt.Net-Next, Version=4.0.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\BCrypt.Net-Next.4.0.3\lib\net35\BCrypt.Net-Next.dll</HintPath>
+    </Reference>
     <Reference Include="Dapper, Version=1.50.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Dapper.1.50.2\lib\net45\Dapper.dll</HintPath>
     </Reference>
@@ -154,6 +157,7 @@
     <Compile Include="App_Start\BundleConfig.cs" />
     <Compile Include="App_Start\CompositionRoot.cs" />
     <Compile Include="App_Start\CrossDomainHandler.cs" />
+    <Compile Include="App_Start\DatabaseConfig.cs" />
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
@@ -186,10 +190,13 @@
     <Compile Include="Areas\HelpPage\SampleGeneration\TextSample.cs" />
     <Compile Include="Areas\HelpPage\XmlDocumentationProvider.cs" />
     <Compile Include="Model\AppSetting.cs" />
+    <Compile Include="Auth\BCryptPasswordHasher.cs" />
+    <Compile Include="Auth\IPasswordHasher.cs" />
     <Compile Include="Auth\IssuedToken.cs" />
     <Compile Include="Auth\ITokenService.cs" />
     <Compile Include="Auth\JwtAuthenticationFilter.cs" />
     <Compile Include="Auth\JwtTokenService.cs" />
+    <Compile Include="Auth\PasswordHashMigration.cs" />
     <Compile Include="Auth\UserPrincipal.cs" />
     <Compile Include="Controllers\FuelDetailController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
@@ -197,14 +204,17 @@
     <Compile Include="Data\ICustomerRepository.cs" />
     <Compile Include="Data\SqLiteBaseRepository.cs" />
     <Compile Include="Data\SqLiteCustomerRepository.cs" />
+    <Compile Include="Data\SqLiteSchema.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Models\Email.cs" />
     <Compile Include="Models\SMS.cs" />
+    <Compile Include="Model\ChangePasswordRequest.cs" />
     <Compile Include="Model\FuelDetails.cs" />
     <Compile Include="Model\LoginResponse.cs" />
     <Compile Include="Model\User.cs" />
+    <Compile Include="Model\UserResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -306,7 +316,6 @@
     <Content Include="Areas\HelpPage\Views\Shared\_Layout.cshtml" />
     <Content Include="Areas\HelpPage\Views\Web.config" />
     <Content Include="Areas\HelpPage\Views\_ViewStart.cshtml" />
-    <Content Include="App_Data\SimpleDb.sqlite" />
     <None Include="Properties\PublishProfiles\FolderProfile.pubxml" />
     <None Include="Scripts\jquery-1.10.2.intellisense.js" />
     <Content Include="Scripts\jquery-1.10.2.min.map" />

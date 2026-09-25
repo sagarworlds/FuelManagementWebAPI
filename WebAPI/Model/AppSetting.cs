@@ -6,7 +6,6 @@ namespace WebAPI.Model
 {
     public static class AppSettings
     {
-        public static string ToEmail { get { return Setting<string>("ToEmail"); } }
         public static string DbConnection { get { return Setting<string>("DbConnection"); } }
         /// <summary>Secret that signs login tokens; kept in the git-ignored Secrets.config.</summary>
         public static string JwtSecret { get { return Setting<string>("JwtSecret"); } }

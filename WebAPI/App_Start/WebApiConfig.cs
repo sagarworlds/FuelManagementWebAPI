@@ -20,7 +20,7 @@ namespace WebAPI
         {
             // Built at startup so a missing or weak secret stops the app instead of failing the first login.
             var tokenService = new JwtTokenService(AppSettings.JwtSecret, TimeSpan.FromMinutes(AppSettings.JwtLifetimeMinutes));
-            Configure(config, () => new SqLiteCustomerRepository(), tokenService);
+            Configure(config, () => new SqLiteCustomerRepository(), tokenService, new BCryptPasswordHasher());
         }
 
         /// <summary>
@@ -30,7 +30,8 @@ namespace WebAPI
         /// <param name="config">The configuration to populate.</param>
         /// <param name="repositoryFactory">Creates a repository for each controller instance.</param>
         /// <param name="tokenService">Issues and validates bearer tokens.</param>
-        public static void Configure(HttpConfiguration config, Func<ICustomerRepository> repositoryFactory, ITokenService tokenService)
+        /// <param name="passwordHasher">Hashes and checks passwords.</param>
+        public static void Configure(HttpConfiguration config, Func<ICustomerRepository> repositoryFactory, ITokenService tokenService, IPasswordHasher passwordHasher)
         {
             // Web API configuration and services            
             //var cors = new EnableCorsAttribute("*", "*", "*");
@@ -57,7 +58,7 @@ namespace WebAPI
             config.Filters.Add(new JwtAuthenticationFilter(tokenService));
             config.Filters.Add(new AuthorizeAttribute());
 
-            config.Services.Replace(typeof(IHttpControllerActivator), new CompositionRoot(repositoryFactory, tokenService));
+            config.Services.Replace(typeof(IHttpControllerActivator), new CompositionRoot(repositoryFactory, tokenService, passwordHasher));
         }
     }
 }

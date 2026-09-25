@@ -16,11 +16,13 @@ namespace WebAPI
     {
         private readonly Func<ICustomerRepository> repositoryFactory;
         private readonly ITokenService tokenService;
+        private readonly IPasswordHasher passwordHasher;
 
         /// <param name="repositoryFactory">Creates a repository for each controller instance.</param>
         /// <param name="tokenService">Issues and validates bearer tokens.</param>
-        /// <exception cref="ArgumentNullException">When either argument is null.</exception>
-        public CompositionRoot(Func<ICustomerRepository> repositoryFactory, ITokenService tokenService)
+        /// <param name="passwordHasher">Hashes and checks passwords.</param>
+        /// <exception cref="ArgumentNullException">When any argument is null.</exception>
+        public CompositionRoot(Func<ICustomerRepository> repositoryFactory, ITokenService tokenService, IPasswordHasher passwordHasher)
         {
             if (repositoryFactory == null)
             {
@@ -30,8 +32,13 @@ namespace WebAPI
             {
                 throw new ArgumentNullException("tokenService");
             }
+            if (passwordHasher == null)
+            {
+                throw new ArgumentNullException("passwordHasher");
+            }
             this.repositoryFactory = repositoryFactory;
             this.tokenService = tokenService;
+            this.passwordHasher = passwordHasher;
         }
 
         /// <inheritdoc />
@@ -44,7 +51,7 @@ namespace WebAPI
             }
             if (controllerType == typeof(UserController))
             {
-                return new UserController(repositoryFactory(), tokenService);
+                return new UserController(repositoryFactory(), tokenService, passwordHasher);
             }
 
             throw new InvalidOperationException(string.Format(

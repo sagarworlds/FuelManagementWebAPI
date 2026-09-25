@@ -48,9 +48,21 @@ namespace WebAPI.Tests.Fakes
             return oUser;
         }
 
-        public User LogIn(User oUser)
+        public User GetUserByEmail(string email)
         {
-            return Users.FirstOrDefault(u => u.Email == oUser.Email && u.Password == oUser.Password);
+            return Users.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public User GetUserById(int id)
+        {
+            return Users.FirstOrDefault(u => u.Id == id);
+        }
+
+        public void UpdatePassword(int userId, string passwordHash, DateTime modifiedAt)
+        {
+            var user = Users.Single(u => u.Id == userId);
+            user.Password = passwordHash;
+            user.ModifiedAt = modifiedAt;
         }
 
         public bool EmailExists(string email)
