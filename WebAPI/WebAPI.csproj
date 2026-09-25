@@ -197,6 +197,8 @@
     <Compile Include="Auth\JwtAuthenticationFilter.cs" />
     <Compile Include="Auth\JwtTokenService.cs" />
     <Compile Include="Auth\PasswordHashMigration.cs" />
+    <Compile Include="Auth\SessionStamp.cs" />
+    <Compile Include="Auth\TokenIdentity.cs" />
     <Compile Include="Auth\UserPrincipal.cs" />
     <Compile Include="Controllers\FuelDetailController.cs" />
     <Compile Include="Controllers\HomeController.cs" />

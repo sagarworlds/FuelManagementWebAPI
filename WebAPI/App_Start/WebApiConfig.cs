@@ -59,7 +59,7 @@ namespace WebAPI
             config.Formatters.JsonFormatter.SerializerSettings.DateTimeZoneHandling = DateTimeZoneHandling.Utc;
 
             // Every action requires a valid bearer token unless it is marked [AllowAnonymous].
-            config.Filters.Add(new JwtAuthenticationFilter(tokenService));
+            config.Filters.Add(new JwtAuthenticationFilter(tokenService, repositoryFactory));
             config.Filters.Add(new AuthorizeAttribute());
 
             config.Services.Replace(typeof(IHttpControllerActivator), new CompositionRoot(repositoryFactory, tokenService, passwordHasher));

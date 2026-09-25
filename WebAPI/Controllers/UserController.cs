@@ -87,22 +87,16 @@ namespace WebAPI.Controllers
                 return Unauthorized();
             }
 
-            var token = tokenService.Issue(user.Id);
-            return Ok(new LoginResponse
-            {
-                Token = token.Value,
-                ExpiresAt = token.ExpiresAtUtc,
-                UserId = user.Id,
-                Email = user.Email
-            });
+            return Ok(StartSession(user));
         }
 
         /// <summary>
-        /// Changes the signed-in user's password. Tokens issued earlier stay valid until they expire.
+        /// Changes the signed-in user's password. Every token issued before the change stops working,
+        /// signing out other sessions; the response carries a new token for the caller.
         /// </summary>
         /// <returns>
-        /// 204 on success; 400 when the new password is invalid or the current one is wrong (not 401,
-        /// which clients treat as an expired session).
+        /// 200 with a new <see cref="LoginResponse"/>; 400 when the new password is invalid or the current
+        /// one is wrong (not 401, which clients treat as an expired session).
         /// </returns>
         [HttpPost]
         public IHttpActionResult ChangePassword(ChangePasswordRequest request)
@@ -127,8 +121,24 @@ namespace WebAPI.Controllers
                 return BadRequest("The current password is incorrect.");
             }
 
-            rep.UpdatePassword(user.Id, passwordHasher.Hash(request.NewPassword), DateTime.UtcNow);
-            return StatusCode(HttpStatusCode.NoContent);
+            user.Password = passwordHasher.Hash(request.NewPassword);
+            rep.UpdatePassword(user.Id, user.Password, DateTime.UtcNow);
+            return Ok(StartSession(user));
+        }
+
+        /// <summary>
+        /// Issues a token tied to the user's current password (see <see cref="SessionStamp"/>).
+        /// </summary>
+        private LoginResponse StartSession(User user)
+        {
+            var token = tokenService.Issue(user.Id, SessionStamp.For(user.Password));
+            return new LoginResponse
+            {
+                Token = token.Value,
+                ExpiresAt = token.ExpiresAtUtc,
+                UserId = user.Id,
+                Email = user.Email
+            };
         }
 
     }

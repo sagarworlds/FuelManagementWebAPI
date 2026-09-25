@@ -140,7 +140,7 @@ namespace WebAPI.Tests.Api
 
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
             var body = JObject.Parse(await response.Content.ReadAsStringAsync());
-            Assert.That(tokenService.ValidateAndGetUserId((string)body["Token"]), Is.EqualTo(2));
+            Assert.That(tokenService.Validate((string)body["Token"]).UserId, Is.EqualTo(2));
             Assert.That((int)body["UserId"], Is.EqualTo(2));
             Assert.That(body["Password"], Is.Null, "The login response must not echo the password.");
         }
@@ -218,9 +218,44 @@ namespace WebAPI.Tests.Api
         {
             var response = await client.SendAsync(ChangePasswordCall("password-one", "new-password-one", 1));
 
-            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That((await client.SendAsync(LoginRequest("one@example.com", "new-password-one"))).StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That((await client.SendAsync(LoginRequest("one@example.com", "password-one"))).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        }
+
+        [Test]
+        public async Task ChangePassword_SignsOutEarlierSessions_ButReturnsAWorkingToken()
+        {
+            var earlierToken = TokenFor(1);
+
+            var response = await client.SendAsync(ChangePasswordCall("password-one", "new-password-one", 1));
+
+            var newToken = (string)JObject.Parse(await response.Content.ReadAsStringAsync())["Token"];
+            Assert.That((await client.SendAsync(WithToken(HttpMethod.Get, "api/FuelDetail/Get", earlierToken))).StatusCode,
+                Is.EqualTo(HttpStatusCode.Unauthorized), "A token issued before the change must stop working.");
+            Assert.That((await client.SendAsync(WithToken(HttpMethod.Get, "api/FuelDetail/Get", newToken))).StatusCode,
+                Is.EqualTo(HttpStatusCode.OK));
+        }
+
+        [Test]
+        public async Task TokenOfADeletedUser_IsUnauthorized()
+        {
+            var token = TokenFor(1);
+            repository.Users.RemoveAll(u => u.Id == 1);
+
+            var response = await client.SendAsync(WithToken(HttpMethod.Get, "api/FuelDetail/Get", token));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        }
+
+        [Test]
+        public async Task TokenWithAnOutdatedStamp_IsUnauthorized()
+        {
+            var token = tokenService.Issue(1, SessionStamp.For(passwordHasher.Hash("an-older-password"))).Value;
+
+            var response = await client.SendAsync(WithToken(HttpMethod.Get, "api/FuelDetail/Get", token));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         }
 
         [Test]
@@ -446,12 +481,23 @@ namespace WebAPI.Tests.Api
 
         private HttpRequestMessage Request(HttpMethod method, string path, int? userId = null)
         {
+            return userId.HasValue
+                ? WithToken(method, path, TokenFor(userId.Value))
+                : new HttpRequestMessage(method, "http://localhost/" + path);
+        }
+
+        private static HttpRequestMessage WithToken(HttpMethod method, string path, string token)
+        {
             var request = new HttpRequestMessage(method, "http://localhost/" + path);
-            if (userId.HasValue)
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.Issue(userId.Value).Value);
-            }
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             return request;
+        }
+
+        /// <summary>A token for the user as a login would issue it now, tied to their current password.</summary>
+        private string TokenFor(int userId)
+        {
+            var user = repository.Users.Single(u => u.Id == userId);
+            return tokenService.Issue(userId, SessionStamp.For(user.Password)).Value;
         }
 
         private HttpRequestMessage LoginRequest(string email, string password)

@@ -59,6 +59,7 @@
     <Compile Include="Auth\BCryptPasswordHasherTests.cs" />
     <Compile Include="Auth\JwtTokenServiceTests.cs" />
     <Compile Include="Auth\PasswordHashMigrationTests.cs" />
+    <Compile Include="Auth\SessionStampTests.cs" />
     <Compile Include="Data\SqLiteCustomerRepositoryTests.cs" />
     <Compile Include="Fakes\FakeCustomerRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

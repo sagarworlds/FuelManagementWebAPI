@@ -61,7 +61,7 @@ Except for **Register** and **Login**, every endpoint requires a bearer token fr
 Authorization: Bearer <Token>
 ```
 
-Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `JwtLifetimeMinutes` (8 hours by default); after that, log in again.
+Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `JwtLifetimeMinutes` (8 hours by default); after that, log in again. A token also stops working as soon as its user changes password or is deleted: tokens carry a stamp derived from the password hash, which is checked on every request.
 
 ### 👤 User Endpoints (`api/user`)
 
@@ -107,7 +107,7 @@ Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `J
     "NewPassword": "EvenMoreSecure456"
   }
   ```
-* **Response**: `204 No Content` on success; `400 Bad Request` if the current password is wrong or the new one isn't 8–100 characters. Tokens issued before the change stay valid until they expire.
+* **Response**: `200 OK` with a new token (same shape as the login response) on success. Every token issued before the change stops working, which signs out other devices. Returns `400 Bad Request` if the current password is wrong or the new one isn't 8–100 characters.
 
 > The old `GET api/user/get`, which listed every user with their password, has been removed.
 
