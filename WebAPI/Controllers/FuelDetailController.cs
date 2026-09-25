@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Net;
 using System.Web.Http;
+using WebAPI.Auth;
 using WebAPI.Data;
 using WebAPI.Model;
 
@@ -8,14 +10,30 @@ namespace WebAPI.Controllers
     public class FuelDetailController : ApiController
     {
         ICustomerRepository rep;
-        public FuelDetailController()
+
+        /// <param name="rep">Reads and stores fuel entries.</param>
+        /// <exception cref="ArgumentNullException">When <paramref name="rep"/> is null.</exception>
+        public FuelDetailController(ICustomerRepository rep)
         {
-            rep = new SqLiteCustomerRepository();
+            if (rep == null)
+            {
+                throw new ArgumentNullException("rep");
+            }
+            this.rep = rep;
         }
 
+        /// <summary>
+        /// Returns a user's entries; only the signed-in user's own id is allowed.
+        /// </summary>
+        /// <returns>200 with the entries, or 403 for another user's id.</returns>
         [HttpGet]
         public IHttpActionResult GetByUserId(int UserId)
         {
+            if (UserId != User.GetUserId())
+            {
+                return StatusCode(HttpStatusCode.Forbidden);
+            }
+
             var fuelDetails = rep.GetListFuelDetailByUserId(new FuelDetail() { UserId = UserId });
             if (fuelDetails == null)
             {
@@ -26,10 +44,13 @@ namespace WebAPI.Controllers
         }
 
 
+        /// <summary>
+        /// Returns the signed-in user's entries.
+        /// </summary>
         [HttpGet]
         public IHttpActionResult Get()
         {
-            var fuelDetails = rep.GetListFuelDetail();
+            var fuelDetails = rep.GetListFuelDetailByUserId(new FuelDetail() { UserId = User.GetUserId() });
             if (fuelDetails == null)
             {
                 return NotFound();
@@ -43,7 +64,8 @@ namespace WebAPI.Controllers
         {
             var fuelDetails = rep.GetFuelDetailById(new FuelDetail() { Id = Id });
 
-            if (fuelDetails == null)
+            // Another user's entry is reported as missing rather than forbidden, so ids can't be probed.
+            if (fuelDetails == null || fuelDetails.UserId != User.GetUserId())
             {
                 return NotFound();
             }
@@ -53,9 +75,20 @@ namespace WebAPI.Controllers
 
 
 
+        /// <summary>
+        /// Stores an entry for the signed-in user.
+        /// </summary>
+        /// <returns>200 with the stored entry, or 400 without a body.</returns>
         [HttpPost]
         public IHttpActionResult Save(FuelDetail oFuelDetail)
         {
+            if (oFuelDetail == null)
+            {
+                return BadRequest("A fuel detail is required.");
+            }
+
+            // The owner comes from the bearer token, never from the request body.
+            oFuelDetail.UserId = User.GetUserId();
             ///oFuelDetail.CreatedAt = DateTime.UtcNow;
             oFuelDetail.ModifiedAt = oFuelDetail.CreatedAt;
             var ofuelDetail = rep.Save(oFuelDetail);
