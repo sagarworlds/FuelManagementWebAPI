@@ -39,6 +39,7 @@ The browser client lives in a separate repository: [FuelManagementAngular](https
 | --- | --- |
 | Runtime | .NET Framework 4.8 |
 | Web framework | ASP.NET Web API 2 (5.2.9), ASP.NET MVC 5.2.9 for the home and help pages |
+| Home and help pages | Bootstrap 3.4.1 and jQuery 3.7.1; the help pages' API test client also uses jQuery UI 1.14.1 and Knockout 3.5.3 |
 | Database | SQLite via System.Data.SQLite 1.0.119 |
 | Data access | Dapper 1.60.6 |
 | Authentication | JWT bearer tokens, HMAC-SHA256 (System.IdentityModel.Tokens.Jwt 5.7) |
@@ -292,5 +293,4 @@ FuelManagementWebAPI/
 
 ## Known limitations
 
-- **Outdated jQuery on the help pages.** The home page (`/`) and the generated help pages (`/Help`) use Bootstrap 3.4.1, but still load the jQuery 1.10 files that came with the original project template. The API itself doesn't use them; update jQuery, or remove these pages, before the site is exposed publicly.
 - **Single-file database.** SQLite suits a single-server deployment with modest traffic. Several servers or heavy concurrent writes would need a server-based database.
