@@ -41,7 +41,7 @@ The browser client lives in a separate repository: [FuelManagementAngular](https
 | Web framework | ASP.NET Web API 2 (5.2.9), ASP.NET MVC 5.2.9 for the home and help pages |
 | Database | SQLite via System.Data.SQLite 1.0.119 |
 | Data access | Dapper 1.60.6 |
-| Authentication | JWT bearer tokens, HMAC-SHA256 (System.IdentityModel.Tokens.Jwt 4.0) |
+| Authentication | JWT bearer tokens, HMAC-SHA256 (System.IdentityModel.Tokens.Jwt 5.7) |
 | Password hashing | bcrypt, cost 12, via BCrypt.Net-Next |
 | Serialization | Newtonsoft.Json 13 |
 | Tests | NUnit 3 |

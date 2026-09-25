@@ -36,6 +36,24 @@ namespace WebAPI.Tests.Auth
         }
 
         [Test]
+        public void TokenIssuedByTheEarlierJwtLibrary_StillValidates()
+        {
+            // Issued with System.IdentityModel.Tokens.Jwt 4.0.4 (the version before 5.7.0) for user 42,
+            // valid 2026-01-01 to 2038-01-01. Upgrading the library must not sign every user out.
+            // The expiry stays before 2038-01-19 because 5.x reads "exp" as a 32-bit number of seconds.
+            const string legacyToken =
+                "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9" +
+                ".eyJzdWIiOiI0MiIsInN0YW1wIjoic2Vzc2lvbi1zdGFtcCIsImlzcyI6IkZ1ZWxNYW5hZ2VtZW50V2ViQVBJIiwiYXVkIjoiRnVlbE1hbmFnZW1lbnRXZWJBUEkiLCJleHAiOjIxNDU5MTY4MDAsIm5iZiI6MTc2NzIyNTYwMH0" +
+                ".NBSxqRhvMiTF8h6AGq4J6F1bsFdey7NpzpnWCFxg9tQ";
+
+            var identity = new JwtTokenService(Secret, OneHour).Validate(legacyToken);
+
+            Assert.That(identity, Is.Not.Null);
+            Assert.That(identity.UserId, Is.EqualTo(42));
+            Assert.That(identity.SessionStamp, Is.EqualTo(Stamp));
+        }
+
+        [Test]
         public void ExpiredToken_IsRejected()
         {
             var twoHoursAgo = DateTime.UtcNow.AddHours(-2);
