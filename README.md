@@ -292,5 +292,5 @@ FuelManagementWebAPI/
 
 ## Known limitations
 
-- **Outdated libraries on the help pages.** The home page (`/`) and the generated help pages (`/Help`) still use the jQuery 1.10 and Bootstrap 3.0 files that came with the original project template. They aren't used by the API itself, but should be updated or removed before the site is exposed publicly.
+- **Outdated jQuery on the help pages.** The home page (`/`) and the generated help pages (`/Help`) use Bootstrap 3.4.1, but still load the jQuery 1.10 files that came with the original project template. The API itself doesn't use them; update jQuery, or remove these pages, before the site is exposed publicly.
 - **Single-file database.** SQLite suits a single-server deployment with modest traffic. Several servers or heavy concurrent writes would need a server-based database.
