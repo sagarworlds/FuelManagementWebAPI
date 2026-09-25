@@ -16,6 +16,9 @@ namespace WebAPI.Auth
         /// <summary>Issuer and audience written into, and required on, every token.</summary>
         public const string Issuer = "FuelManagementWebAPI";
 
+        /// <summary>Claim that carries the <see cref="SessionStamp"/>.</summary>
+        public const string SessionStampClaim = "stamp";
+
         // HMAC-SHA256 needs a key at least as long as its 256-bit output to be full strength.
         private const int MinimumSecretBytes = 32;
 
@@ -73,22 +76,32 @@ namespace WebAPI.Auth
         }
 
         /// <inheritdoc />
-        public IssuedToken Issue(int userId)
+        /// <exception cref="ArgumentException">When <paramref name="sessionStamp"/> is null or empty.</exception>
+        public IssuedToken Issue(int userId, string sessionStamp)
         {
+            if (string.IsNullOrEmpty(sessionStamp))
+            {
+                throw new ArgumentException("A session stamp is required.", "sessionStamp");
+            }
+
             var issuedAt = utcNow();
             var expiresAt = issuedAt.Add(lifetime);
             var credentials = new SigningCredentials(
                 new InMemorySymmetricSecurityKey(key),
                 SecurityAlgorithms.HmacSha256Signature,
                 SecurityAlgorithms.Sha256Digest);
-            var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)) };
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)),
+                new Claim(SessionStampClaim, sessionStamp)
+            };
 
             var token = new JwtSecurityToken(Issuer, Issuer, claims, issuedAt, expiresAt, credentials);
             return new IssuedToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
         }
 
         /// <inheritdoc />
-        public int? ValidateAndGetUserId(string token)
+        public TokenIdentity Validate(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -137,7 +150,8 @@ namespace WebAPI.Auth
                 Trace.TraceWarning("Rejected bearer token: missing or non-numeric subject.");
                 return null;
             }
-            return userId;
+            var stamp = principal.FindFirst(SessionStampClaim);
+            return new TokenIdentity(userId, stamp == null ? null : stamp.Value);
         }
     }
 }

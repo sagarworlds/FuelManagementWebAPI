@@ -1,191 +1,296 @@
 # Fuel Management Web API
 
-[![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.5-blue.svg)](https://dotnet.microsoft.com/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg?logo=sqlite)](https://sqlite.org/)
-[![Dapper](https://img.shields.io/badge/ORM-Dapper-lightgrey.svg)](https://github.com/DapperLib/Dapper)
+[![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet-framework/net48)
+[![ASP.NET Web API](https://img.shields.io/badge/ASP.NET%20Web%20API-5.2.9-512BD4.svg)](https://learn.microsoft.com/aspnet/web-api/)
+[![SQLite](https://img.shields.io/badge/SQLite-1.0.119-003B57.svg?logo=sqlite)](https://system.data.sqlite.org/)
+[![Tests](https://img.shields.io/badge/tests-NUnit%203-2E7D32.svg)](https://nunit.org/)
 
-A lightweight and robust backend service designed to track fuel logs, manage users, and monitor fuel consumption/expenses. Built with **ASP.NET Web API (.NET Framework 4.5)**, **SQLite**, and **Dapper Micro-ORM**.
+The REST API behind **Fuel Management**, an application for logging vehicle fill-ups and tracking fuel spend, consumption and mileage. It handles user accounts and token-based authentication, and stores each user's fuel log in a local SQLite database.
 
----
+The browser client lives in a separate repository: [FuelManagementAngular](https://github.com/sagarworlds/FuelManagementAngular).
 
-## 🚀 Features
+## Contents
 
-- **User Management**: Registration, login that issues a JWT bearer token, and password changes. Passwords are stored as bcrypt hashes and never returned by the API.
-- **Per-user data**: Every fuel endpoint requires a token and only reads or writes the signed-in user's entries.
-- **Fuel Tracking**: Record details such as odometer reading (meter reading), total price, fuel added, and personalized notes.
-- **Robust Storage**: Uses SQLite for localized, file-based database storage.
-- **High Performance**: Employs Dapper ORM for fast and efficient SQL execution.
-- **Cross-Domain Support**: Integrates CORS handling for seamless client-side interactions.
+- [Features](#features)
+- [Technology](#technology)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [API reference](#api-reference)
+- [Security](#security)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Upgrading from earlier versions](#upgrading-from-earlier-versions)
+- [Project structure](#project-structure)
+- [Known limitations](#known-limitations)
 
----
+## Features
 
-## 🛠️ Tech Stack
+- **Accounts:** registration, sign-in and password changes.
+- **Token authentication:** sign-in returns a signed JSON Web Token (JWT). Changing a password immediately signs out every other session.
+- **Private data:** each user reads and writes only their own fuel entries. The user is always taken from the token, never from the request.
+- **Validated input:** invalid values are rejected with `400 Bad Request` and a message for each field.
+- **Consistent time handling:** all dates are stored and returned in UTC.
+- **Zero-setup database:** the SQLite database and its tables are created on first start.
 
-- **Framework**: ASP.NET Web API 2 (.NET Framework 4.5)
-- **Database**: SQLite
-- **Data Access**: Dapper (Micro-ORM)
-- **Authentication**: JWT bearer tokens (HMAC-SHA256, `System.IdentityModel.Tokens.Jwt`)
-- **Password hashing**: bcrypt (`BCrypt.Net-Next`, cost 12, SHA-384 pre-hash so long passwords aren't truncated)
-- **Tests**: NUnit 3
-- **Language**: C#
+## Technology
 
----
+| Area | Choice |
+| --- | --- |
+| Runtime | .NET Framework 4.8 |
+| Web framework | ASP.NET Web API 2 (5.2.9), ASP.NET MVC 5.2.9 for the home and help pages |
+| Database | SQLite via System.Data.SQLite 1.0.119 |
+| Data access | Dapper 1.60.6 |
+| Authentication | JWT bearer tokens, HMAC-SHA256 (System.IdentityModel.Tokens.Jwt 4.0) |
+| Password hashing | bcrypt, cost 12, via BCrypt.Net-Next |
+| Serialization | Newtonsoft.Json 13 |
+| Tests | NUnit 3 |
 
-## 📁 Repository Structure
+## Architecture
+
+Every API request passes through the same pipeline:
 
 ```text
-FuelManagementWebAPI/
-├── FuelManagementWebAPI.sln  # Visual Studio Solution file
-└── WebAPI/                   # Main Web API Project
-    ├── App_Data/             # SQLite database (SimpleDb.sqlite), created on first start; not in git
-    ├── App_Start/            # Routing, CORS, auth filters (WebApiConfig.cs) and controller wiring (CompositionRoot.cs)
-    ├── Auth/                 # JWT issuing/validation and the bearer-token authentication filter
-    ├── Controllers/          # API Controllers (UserController, FuelDetailController)
-    ├── Data/                 # Repository layer (Dapper queries and connection helpers)
-    ├── Model/                # Core Data Transfer Objects & Domain Models (User, FuelDetail)
-    ├── Models/               # Utility helper models (Email, SMS)
-    ├── Web.config            # Application configuration & AppSettings
-    └── Secrets.config.example # Template for the git-ignored Secrets.config (JWT signing secret)
-└── WebAPI.Tests/             # NUnit tests (token service and the in-memory API pipeline)
+HTTP request
+  -> CrossDomainHandler        CORS: answers preflights, adds headers for allowed origins
+  -> JwtAuthenticationFilter   validates the bearer token and its session stamp
+  -> AuthorizeAttribute        global; rejects anonymous requests except [AllowAnonymous] actions
+  -> Controller                UserController, FuelDetailController (created by CompositionRoot)
+  -> ICustomerRepository       SqLiteCustomerRepository (Dapper)
+  -> SQLite                    App_Data/SimpleDb.sqlite
 ```
 
----
+- **Startup:** `Global.asax` first calls `DatabaseConfig.Initialize()`, which creates the database schema if it's missing and hashes any passwords still stored in plain text. It then calls `WebApiConfig.Register()`, which reads the configuration and builds the pipeline.
+- **Dependency injection:** `CompositionRoot` creates the controllers and supplies their dependencies (repository, token service, password hasher) through their constructors. The tests use the same composition with an in-memory repository.
 
-## 🔌 API Documentation
-
-### 🔐 Authentication
-
-Except for **Register** and **Login**, every endpoint requires a bearer token from `POST api/user/login`:
-
-```http
-Authorization: Bearer <Token>
-```
-
-Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `JwtLifetimeMinutes` (8 hours by default); after that, log in again.
-
-### 👤 User Endpoints (`api/user`)
-
-#### 1. Register User
-* **URL**: `POST api/user/save`
-* **Headers**: `Content-Type: application/json`
-* **Request Body**:
-  ```json
-  {
-    "Email": "user@example.com",
-    "Password": "SecurePassword123"
-  }
-  ```
-* **Validation**: `Email` must be a valid address; `Password` must be 8–100 characters.
-* **Response**: `200 OK` with the registered user's `Id`, `Email` and timestamps (set by the server), never the password; `400 Bad Request` with the validation errors; `409 Conflict` if the email is already registered (ignoring letter case).
-
-#### 2. User Login
-* **URL**: `POST api/user/login`
-* **Headers**: `Content-Type: application/json`
-* **Request Body**:
-  ```json
-  {
-    "Email": "user@example.com",
-    "Password": "SecurePassword123"
-  }
-  ```
-* **Response**: `200 OK` with a token on success, or `401 Unauthorized` if the email or password is wrong:
-  ```json
-  {
-    "Token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-    "ExpiresAt": "2026-07-09T20:00:00Z",
-    "UserId": 1,
-    "Email": "user@example.com"
-  }
-  ```
-
-#### 3. Change Password
-* **URL**: `POST api/user/changepassword` (requires a token)
-* **Request Body**:
-  ```json
-  {
-    "CurrentPassword": "SecurePassword123",
-    "NewPassword": "EvenMoreSecure456"
-  }
-  ```
-* **Response**: `204 No Content` on success; `400 Bad Request` if the current password is wrong or the new one isn't 8–100 characters. Tokens issued before the change stay valid until they expire.
-
-> The old `GET api/user/get`, which listed every user with their password, has been removed.
-
----
-
-### ⛽ Fuel Detail Endpoints (`api/fueldetail`)
-
-All fuel endpoints require a token and act on the signed-in user's entries only.
-
-**Dates are UTC.** Send ISO-8601 with an offset (e.g. `2026-07-09T12:00:00Z` or `2026-07-09T17:30:00+05:30`); the API converts it to UTC, and a value without an offset is taken as UTC. Responses always end in `Z`.
-
-#### 1. Save Fuel Log
-* **URL**: `POST api/fueldetail/save`
-* **Headers**: `Content-Type: application/json`
-* **Request Body**:
-  ```json
-  {
-    "UserId": 1,
-    "MeterReading": 12450,
-    "TotalPrice": 55.50,
-    "AddedFuel": 45.2,
-    "Note": "Filled tank at Shell",
-    "CreatedAt": "2026-07-09T12:00:00Z"
-  }
-  ```
-* **Validation**: `MeterReading` must be a positive whole number; `TotalPrice` and `AddedFuel` must be greater than 0; `CreatedAt` is required and can't be in the future; `Note` is at most 1000 characters. Invalid values, including text where a number is expected, return `400 Bad Request` with the errors.
-* **Response**: Returns the created fuel log entry. `UserId` is always taken from the token and `ModifiedAt` is set by the server; values for them in the body are ignored.
-
-#### 2. Get Fuel Logs by User ID
-* **URL**: `GET api/fueldetail/getbyuserid?userid={UserId}`
-* **Response**: Returns the fuel logs for `userid`, which must be the signed-in user's id (`403 Forbidden` otherwise).
-
-#### 3. Get Fuel Log by Log ID
-* **URL**: `GET api/fueldetail/getfueldetailbyid?id={Id}`
-* **Response**: Returns the specific fuel log entry, or `404 Not Found` if it doesn't exist or belongs to another user.
-
-#### 4. Get My Fuel Logs
-* **URL**: `GET api/fueldetail/get`
-* **Response**: Returns all of the signed-in user's fuel logs.
-
----
-
-## ⚙️ Configuration & Setup
+## Getting started
 
 ### Prerequisites
-1. **Windows OS**
-2. **Visual Studio 2017+** (with .NET desktop development and ASP.NET workloads enabled)
-3. **.NET Framework 4.5**
 
-### Database Setup
-The application uses a local SQLite database file:
-- Located at: `WebAPI/App_Data/SimpleDb.sqlite`
-- The path is configured in `Web.config`:
-  ```xml
-  <appSettings>
-    <add key="DbConnection" value="/App_data/SimpleDb.sqlite" />
-  </appSettings>
-  ```
-- **It is not in source control**, because it holds user data. On start, the API creates the file and its tables if they're missing. It also hashes any passwords still stored as plain text by earlier versions, so existing users keep their passwords.
-- **Publishing excludes `App_Data`** (`ExcludeApp_Data` in the publish profile), so deploying never overwrites the server's database. When copying a build to the server, don't replace its `App_Data` folder either.
+- Windows with Visual Studio 2019 or later and the **ASP.NET and web development** workload.
+- .NET Framework 4.8 Developer Pack, included with Visual Studio 2019 16.3 and later.
 
-### JWT Secret Setup
-Login tokens are signed with a secret that is kept out of source control:
-1. Copy `WebAPI/Secrets.config.example` to `WebAPI/Secrets.config` (git-ignored).
-2. Set `JwtSecret` to at least 32 random characters; the example file shows a PowerShell one-liner that generates one.
+### Set up and run
 
-`Web.config` merges `Secrets.config` into its `appSettings`. The API refuses to start if `JwtSecret` is missing or shorter than 32 bytes. Publishing includes `Secrets.config` when it exists, so the server gets the same secret; use a different secret per environment.
-
-### How to Run
-1. Clone this repository:
+1. Clone the repository and open the solution:
    ```bash
    git clone https://github.com/sagarworlds/FuelManagementWebAPI.git
    ```
-2. Open `FuelManagementWebAPI.sln` in Visual Studio.
-3. Restore NuGet packages when prompted.
-4. Set the `WebAPI` project as the **Startup Project**.
-5. Press `F5` or click **Start** to run the API using IIS Express.
-6. The browser will launch, and you can access endpoints via `http://localhost:YOUR_PORT/api/...`.
+   Then open `FuelManagementWebAPI.sln` in Visual Studio.
+2. Restore NuGet packages: right-click the solution, then choose **Restore NuGet Packages**.
+3. Create the secrets file. Copy `WebAPI/Secrets.config.example` to `WebAPI/Secrets.config` and set `JwtSecret` to a random value of at least 32 characters. The example file contains a PowerShell command that generates one. The API won't start without it.
+4. Set **WebAPI** as the startup project and press **F5**. The API runs on IIS Express at `http://localhost:<port>/api/...`.
+5. Create an account, either from the Angular client's Register page or directly:
+   ```bash
+   curl -X POST http://localhost:<port>/api/User/Save \
+        -H "Content-Type: application/json" \
+        -d '{"Email":"you@example.com","Password":"choose-a-password"}'
+   ```
 
-### Running Tests
-Open **Test Explorer** in Visual Studio and run all tests; the `WebAPI.Tests` project uses NUnit 3 with the NUnit 3 test adapter. The tests host the API in memory with a fake repository, so they don't need IIS or the SQLite database.
+## Configuration
+
+Settings live in the `appSettings` section of `WebAPI/Web.config`. Secrets go in `WebAPI/Secrets.config`, which is git-ignored and merged into `appSettings` at runtime.
+
+| Setting | File | Default | Purpose |
+| --- | --- | --- | --- |
+| `JwtSecret` | `Secrets.config` | *(none; required)* | Key that signs login tokens. At least 32 bytes. Anyone who has it can sign in as any user, so use a different value in each environment. |
+| `JwtLifetimeMinutes` | `Web.config` | `480` | How long a login token stays valid. |
+| `AllowedOrigins` | `Web.config` | `http://localhost:4200` | Comma-separated browser origins (`scheme://host[:port]`) that may call the API from another origin. `*` allows any origin. |
+| `DbConnection` | `Web.config` | `/App_Data/SimpleDb.sqlite` | Location of the SQLite database, relative to the application folder. |
+
+**CORS:** a web client served from a different origin than the API must be listed in `AllowedOrigins`, or the browser will block its requests. A client served from the same origin needs no entry. Preflight requests from unlisted origins receive `403 Forbidden`.
+
+## API reference
+
+Routes follow the pattern `api/{controller}/{action}`. Request and response bodies are JSON with PascalCase property names.
+
+### Authentication
+
+Obtain a token from `POST api/User/Login` and send it with every other request:
+
+```http
+Authorization: Bearer <token>
+```
+
+A token is rejected with `401 Unauthorized` in any of these cases:
+- it has expired (see `JwtLifetimeMinutes`)
+- its user has changed password since it was issued
+- its user no longer exists
+
+### Endpoints
+
+| Method | Route | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `api/User/Save` | Public | Register a new account. |
+| `POST` | `api/User/Login` | Public | Sign in and receive a token. |
+| `POST` | `api/User/ChangePassword` | Token | Change the password and receive a new token. |
+| `GET` | `api/FuelDetail/Get` | Token | List the signed-in user's fuel entries. |
+| `GET` | `api/FuelDetail/GetFuelDetailById?Id={id}` | Token | Get one of the signed-in user's entries. |
+| `GET` | `api/FuelDetail/GetByUserId?UserId={id}` | Token | List entries for a user id; only the signed-in user's own id is permitted. |
+| `POST` | `api/FuelDetail/Save` | Token | Record a fill-up for the signed-in user. |
+
+#### Register: `POST api/User/Save`
+
+```json
+{ "Email": "you@example.com", "Password": "choose-a-password" }
+```
+
+- **Rules:** `Email` must be a valid address of up to 254 characters. `Password` must be 8 to 100 characters.
+- **`200 OK`:** returns the new user's `Id`, `Email`, `CreatedAt` and `ModifiedAt`. The password is never returned.
+- **`400 Bad Request`:** returns the validation errors.
+- **`409 Conflict`:** the email is already registered, ignoring letter case.
+
+#### Sign in: `POST api/User/Login`
+
+```json
+{ "Email": "you@example.com", "Password": "choose-a-password" }
+```
+
+**`200 OK`:**
+
+```json
+{
+  "Token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "ExpiresAt": "2026-07-09T20:00:00Z",
+  "UserId": 1,
+  "Email": "you@example.com"
+}
+```
+
+- Email matching ignores letter case.
+- A wrong email or password returns `401 Unauthorized`, without revealing which one was wrong.
+
+#### Change password: `POST api/User/ChangePassword`
+
+```json
+{ "CurrentPassword": "choose-a-password", "NewPassword": "a-new-password" }
+```
+
+- **`200 OK`:** returns a new token, in the same shape as sign-in. Every token issued before the change stops working, which signs out other devices.
+- **`400 Bad Request`:** the current password is wrong, or the new one isn't 8 to 100 characters. This is deliberately not `401`, so clients don't mistake it for an expired session.
+
+#### Record a fill-up: `POST api/FuelDetail/Save`
+
+```json
+{
+  "MeterReading": 12450,
+  "TotalPrice": 2250.00,
+  "AddedFuel": 22.5,
+  "Note": "Full tank",
+  "CreatedAt": "2026-07-09T18:30:00Z"
+}
+```
+
+- **Rules:**
+  - `MeterReading` must be a positive whole number.
+  - `TotalPrice` and `AddedFuel` must be greater than 0.
+  - `CreatedAt` is required and may not be in the future.
+  - `Note` is optional, up to 1000 characters.
+- **Response:** returns the stored entry.
+- **Server-set fields:** `UserId` comes from the token and `ModifiedAt` is set by the server; any values sent for them are ignored.
+
+#### Reading entries
+
+- `GET api/FuelDetail/Get` returns all of the signed-in user's entries.
+- `GET api/FuelDetail/GetFuelDetailById?Id={id}` returns `404 Not Found` for entries belonging to other users.
+- `GET api/FuelDetail/GetByUserId?UserId={id}` returns `403 Forbidden` for any id other than the signed-in user's.
+
+### Dates
+
+- **Stored and returned in UTC.** Responses always end in `Z`, for example `2026-07-09T18:30:00Z`.
+- **Accepted input:** ISO-8601 values with an offset (`Z` or `+05:30`) are converted to UTC. A value without an offset is treated as UTC.
+
+### Status codes
+
+| Code | Meaning |
+| --- | --- |
+| `200` | Success. |
+| `400` | Invalid input. For field errors the body lists them under `ModelState`; otherwise it has a `Message`. |
+| `401` | Missing, invalid or revoked token, or wrong credentials at sign-in. |
+| `403` | The request targets another user's data, or a CORS preflight came from an origin that isn't allowed. |
+| `404` | The resource doesn't exist or belongs to another user. |
+| `409` | The email address is already registered. |
+
+## Security
+
+- **Password storage:** bcrypt with a work factor of 12. Passwords are pre-hashed with SHA-384, so characters beyond bcrypt's 72-byte limit still count. When the email is unknown, sign-in checks against a dummy hash, so response times don't reveal which accounts exist.
+- **Tokens:** HMAC-SHA256 JWTs with a fixed issuer and audience and no clock-skew allowance.
+  - Each token carries a *session stamp* derived from the user's password hash. It is checked on every request, so a password change revokes all earlier tokens.
+  - Malformed tokens, tampered tokens and unsigned (`alg: none`) tokens are all rejected.
+- **Authorization:** all actions require a token unless explicitly marked `[AllowAnonymous]` (register and sign-in). Data access is scoped to the user identified by the token.
+- **CORS:** only origins listed in `AllowedOrigins` receive CORS headers.
+- **Secrets and data stay out of source control:**
+  - `Secrets.config` and the SQLite database are git-ignored.
+  - The publish profile excludes `App_Data`, so a deployment never overwrites the live database.
+- **Fail-fast startup:** the API refuses to start if `JwtSecret` is missing or shorter than 32 bytes.
+
+## Testing
+
+`WebAPI.Tests` is an NUnit 3 project that runs without IIS. It covers:
+
+- **Token service:** issuing, expiry, tampering, wrong keys, unsigned and malformed tokens.
+- **Password hashing** and the migration of plain-text passwords.
+- **The full Web API pipeline, hosted in memory with a fake repository:**
+  - routing and CORS
+  - authentication and per-user scoping
+  - validation and UTC handling
+  - registration, sign-in and password changes, including session revocation
+- **`SqLiteCustomerRepository` against a real, temporary SQLite database.** This covers schema creation, UTC round-trips, both legacy date formats, and the user queries.
+
+**Visual Studio:** open **Test Explorer** and choose **Run All**. The NUnit 3 test adapter is included as a package.
+
+**Command line (Developer Command Prompt):**
+
+```bat
+nuget restore FuelManagementWebAPI.sln
+msbuild FuelManagementWebAPI.sln /p:Configuration=Debug
+vstest.console WebAPI.Tests\bin\Debug\WebAPI.Tests.dll /TestAdapterPath:WebAPI.Tests\bin\Debug
+```
+
+## Deployment
+
+1. **Publish.** In Visual Studio, right-click **WebAPI**, choose **Publish** and use the **FolderProfile** profile. It publishes to `WebAPI\bin\Release\Publish` and excludes `App_Data`.
+2. **Server.** The server needs Windows with IIS and .NET Framework 4.8, which ships with Windows 10 1903+ and Windows Server 2022+; install it on older versions. Create an IIS site or application, for example `/API`, with an application pool on **.NET CLR v4.0** in **Integrated** pipeline mode.
+3. **Copy the published files**, but never overwrite the server's existing `App_Data` folder.
+4. **Secrets and settings.** On the server, create `Secrets.config` next to `Web.config` with a production `JwtSecret`, and set `AllowedOrigins` to the address the web client is served from. If a local `Secrets.config` exists when you publish, it is copied into the output, so replace it rather than deploying your development secret.
+5. **Permissions.** Give the application pool identity **Modify** permission on `App_Data`. SQLite writes the database file and a journal file next to it.
+6. **First request.** On the first request the application creates the database if needed and migrates legacy passwords.
+
+## Upgrading from earlier versions
+
+These changes affect existing installations and clients:
+
+- **Passwords:** plain-text passwords in an existing database are hashed automatically on first start. Users keep their passwords.
+- **Tokens:** tokens issued before the upgrade don't carry a session stamp and are rejected, so every user signs in once more.
+- **Sign-in response:** it now returns `{ Token, ExpiresAt, UserId, Email }` instead of the user record, and wrong credentials return `401` (previously `404`).
+- **Removed endpoint:** `GET api/User/Get`, which listed all users, no longer exists.
+- **Per-user data:** `GET api/FuelDetail/Get` returns only the signed-in user's entries, not every user's.
+- **Database file:** it is no longer part of the repository. Keep a backup of any existing `App_Data/SimpleDb.sqlite` before pulling, because git will remove the tracked copy from your working folder.
+- **Runtime and packages:** the project targets .NET Framework 4.8. Its packages were updated to their current compatible releases, and the unused Entity Framework and ASP.NET CORS packages were removed.
+
+## Project structure
+
+```text
+FuelManagementWebAPI/
+├── FuelManagementWebAPI.sln
+├── WebAPI/
+│   ├── App_Data/                  SQLite database (created at runtime; git-ignored)
+│   ├── App_Start/
+│   │   ├── CompositionRoot.cs     Creates controllers with their dependencies
+│   │   ├── CrossDomainHandler.cs  CORS allowlist
+│   │   ├── DatabaseConfig.cs      Schema creation and password migration at startup
+│   │   └── WebApiConfig.cs        Routes, filters, JSON settings
+│   ├── Auth/                      JWT service, authentication filter, session stamps, password hashing
+│   ├── Controllers/               UserController, FuelDetailController
+│   ├── Data/                      Repository interface, SQLite repository, schema
+│   ├── Model/                     Request/response and data models, settings accessor
+│   ├── Areas/HelpPage/            Generated API help pages (/Help)
+│   ├── Web.config                 Application settings
+│   └── Secrets.config.example     Template for the git-ignored Secrets.config
+└── WebAPI.Tests/                  NUnit tests
+```
+
+## Known limitations
+
+- **Outdated libraries on the help pages.** The home page (`/`) and the generated help pages (`/Help`) still use the jQuery 1.10 and Bootstrap 3.0 files that came with the original project template. They aren't used by the API itself, but should be updated or removed before the site is exposed publicly.
+- **Single-file database.** SQLite suits a single-server deployment with modest traffic. Several servers or heavy concurrent writes would need a server-based database.
