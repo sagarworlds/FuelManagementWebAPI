@@ -1,10 +1,10 @@
 # Fuel Management Web API
 
-[![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.5-blue.svg)](https://dotnet.microsoft.com/)
+[![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-blue.svg)](https://dotnet.microsoft.com/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg?logo=sqlite)](https://sqlite.org/)
 [![Dapper](https://img.shields.io/badge/ORM-Dapper-lightgrey.svg)](https://github.com/DapperLib/Dapper)
 
-A lightweight and robust backend service designed to track fuel logs, manage users, and monitor fuel consumption/expenses. Built with **ASP.NET Web API (.NET Framework 4.5)**, **SQLite**, and **Dapper Micro-ORM**.
+A lightweight and robust backend service designed to track fuel logs, manage users, and monitor fuel consumption/expenses. Built with **ASP.NET Web API (.NET Framework 4.8)**, **SQLite**, and **Dapper Micro-ORM**.
 
 ---
 
@@ -21,7 +21,7 @@ A lightweight and robust backend service designed to track fuel logs, manage use
 
 ## 🛠️ Tech Stack
 
-- **Framework**: ASP.NET Web API 2 (.NET Framework 4.5)
+- **Framework**: ASP.NET Web API 2 (.NET Framework 4.8)
 - **Database**: SQLite
 - **Data Access**: Dapper (Micro-ORM)
 - **Authentication**: JWT bearer tokens (HMAC-SHA256, `System.IdentityModel.Tokens.Jwt`)
@@ -154,8 +154,8 @@ All fuel endpoints require a token and act on the signed-in user's entries only.
 
 ### Prerequisites
 1. **Windows OS**
-2. **Visual Studio 2017+** (with .NET desktop development and ASP.NET workloads enabled)
-3. **.NET Framework 4.5**
+2. **Visual Studio 2019+** (with the ASP.NET and web development workload)
+3. **.NET Framework 4.8 Developer Pack** (included with Visual Studio 2019 16.3+). On the server, .NET Framework 4.8 comes with Windows 10 1903+ and Windows Server 2022+; install it on older versions.
 
 ### Database Setup
 The application uses a local SQLite database file:
