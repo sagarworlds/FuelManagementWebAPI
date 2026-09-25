@@ -22,6 +22,7 @@ namespace WebAPI.Tests.Api
     public class ApiPipelineTests
     {
         private const string Secret = "test-secret-that-is-at-least-32-bytes-long";
+        private const string AllowedOrigin = "http://localhost:4200";
 
         private FakeCustomerRepository repository;
         private JwtTokenService tokenService;
@@ -42,7 +43,7 @@ namespace WebAPI.Tests.Api
 
             tokenService = new JwtTokenService(Secret, TimeSpan.FromHours(1));
             var config = new HttpConfiguration();
-            WebApiConfig.Configure(config, () => repository, tokenService, passwordHasher);
+            WebApiConfig.Configure(config, () => repository, tokenService, passwordHasher, new[] { AllowedOrigin });
             config.IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Always;
             server = new HttpServer(config);
             client = new HttpClient(server);
@@ -373,6 +374,49 @@ namespace WebAPI.Tests.Api
             var user = repository.Users.Last();
             Assert.That(user.CreatedAt, Is.EqualTo(DateTime.UtcNow).Within(TimeSpan.FromMinutes(1)));
             Assert.That(user.ModifiedAt, Is.EqualTo(user.CreatedAt));
+        }
+
+        [Test]
+        public async Task CorsPreflight_FromAnotherOrigin_IsRefused()
+        {
+            var request = Request(HttpMethod.Options, "api/FuelDetail/Get");
+            request.Headers.Add("Origin", "https://evil.example");
+            request.Headers.Add("Access-Control-Request-Method", "GET");
+            request.Headers.Add("Access-Control-Request-Headers", "authorization");
+
+            var response = await client.SendAsync(request);
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(response.Headers.Contains("Access-Control-Allow-Origin"), Is.False);
+            Assert.That(response.Headers.Contains("Access-Control-Allow-Headers"), Is.False);
+        }
+
+        [Test]
+        public async Task ResponseToAnotherOrigin_HasNoAllowOriginHeader()
+        {
+            var request = Request(HttpMethod.Get, "api/FuelDetail/Get", 1);
+            request.Headers.Add("Origin", "https://evil.example");
+
+            var response = await client.SendAsync(request);
+
+            // The browser then hides the response from the calling page.
+            Assert.That(response.Headers.Contains("Access-Control-Allow-Origin"), Is.False);
+            Assert.That(response.Headers.Vary, Does.Contain("Origin"));
+        }
+
+        [Test]
+        public async Task CorsPreflight_WithoutRequestedHeaders_Succeeds()
+        {
+            // This used to throw: the handler read Access-Control-Request-Headers without checking it was sent.
+            var request = Request(HttpMethod.Options, "api/FuelDetail/Get");
+            request.Headers.Add("Origin", AllowedOrigin);
+            request.Headers.Add("Access-Control-Request-Method", "DELETE");
+
+            var response = await client.SendAsync(request);
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(response.Headers.GetValues("Access-Control-Allow-Methods").Single(), Is.EqualTo("DELETE"));
+            Assert.That(response.Headers.Contains("Access-Control-Allow-Headers"), Is.False);
         }
 
         private HttpRequestMessage JsonRequest(HttpMethod method, string path, string json, int? userId = null)

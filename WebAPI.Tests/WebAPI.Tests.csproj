@@ -55,6 +55,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Api\ApiPipelineTests.cs" />
+    <Compile Include="Api\CrossDomainHandlerTests.cs" />
     <Compile Include="Auth\BCryptPasswordHasherTests.cs" />
     <Compile Include="Auth\JwtTokenServiceTests.cs" />
     <Compile Include="Auth\PasswordHashMigrationTests.cs" />

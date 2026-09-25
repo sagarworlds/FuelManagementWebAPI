@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Web.Http;
 using Newtonsoft.Json;
 using System.Web.Http.Dispatcher;
@@ -20,7 +21,8 @@ namespace WebAPI
         {
             // Built at startup so a missing or weak secret stops the app instead of failing the first login.
             var tokenService = new JwtTokenService(AppSettings.JwtSecret, TimeSpan.FromMinutes(AppSettings.JwtLifetimeMinutes));
-            Configure(config, () => new SqLiteCustomerRepository(), tokenService, new BCryptPasswordHasher());
+            Configure(config, () => new SqLiteCustomerRepository(), tokenService, new BCryptPasswordHasher(),
+                CrossDomainHandler.ParseOrigins(AppSettings.AllowedOrigins));
         }
 
         /// <summary>
@@ -31,7 +33,9 @@ namespace WebAPI
         /// <param name="repositoryFactory">Creates a repository for each controller instance.</param>
         /// <param name="tokenService">Issues and validates bearer tokens.</param>
         /// <param name="passwordHasher">Hashes and checks passwords.</param>
-        public static void Configure(HttpConfiguration config, Func<ICustomerRepository> repositoryFactory, ITokenService tokenService, IPasswordHasher passwordHasher)
+        /// <param name="allowedOrigins">Browser origins allowed to call the API across origins.</param>
+        public static void Configure(HttpConfiguration config, Func<ICustomerRepository> repositoryFactory, ITokenService tokenService,
+            IPasswordHasher passwordHasher, IEnumerable<string> allowedOrigins)
         {
             // Web API configuration and services            
             //var cors = new EnableCorsAttribute("*", "*", "*");
@@ -47,7 +51,7 @@ namespace WebAPI
             );
 
 
-            config.MessageHandlers.Add(new CrossDomainHandler());
+            config.MessageHandlers.Add(new CrossDomainHandler(allowedOrigins));
 
             // Dates are UTC end to end: incoming values with an offset are converted to UTC, values
             // without one are taken as UTC, and responses always carry a "Z" so clients parse them

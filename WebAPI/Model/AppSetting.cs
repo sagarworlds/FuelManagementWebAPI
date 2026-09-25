@@ -9,6 +9,8 @@ namespace WebAPI.Model
         public static string DbConnection { get { return Setting<string>("DbConnection"); } }
         /// <summary>Secret that signs login tokens; kept in the git-ignored Secrets.config.</summary>
         public static string JwtSecret { get { return Setting<string>("JwtSecret"); } }
+        /// <summary>Comma-separated browser origins allowed to call the API across origins (CORS).</summary>
+        public static string AllowedOrigins { get { return Setting<string>("AllowedOrigins"); } }
         /// <summary>How long a login token stays valid, in minutes.</summary>
         public static int JwtLifetimeMinutes { get { return Setting<int>("JwtLifetimeMinutes"); } }
         

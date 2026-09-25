@@ -15,7 +15,7 @@ A lightweight and robust backend service designed to track fuel logs, manage use
 - **Fuel Tracking**: Record details such as odometer reading (meter reading), total price, fuel added, and personalized notes.
 - **Robust Storage**: Uses SQLite for localized, file-based database storage.
 - **High Performance**: Employs Dapper ORM for fast and efficient SQL execution.
-- **Cross-Domain Support**: Integrates CORS handling for seamless client-side interactions.
+- **Cross-Domain Support**: CORS for the browser origins listed in `AllowedOrigins`.
 
 ---
 
@@ -175,6 +175,17 @@ Login tokens are signed with a secret that is kept out of source control:
 2. Set `JwtSecret` to at least 32 random characters; the example file shows a PowerShell one-liner that generates one.
 
 `Web.config` merges `Secrets.config` into its `appSettings`. The API refuses to start if `JwtSecret` is missing or shorter than 32 bytes. Publishing includes `Secrets.config` when it exists, so the server gets the same secret; use a different secret per environment.
+
+### Allowed Origins (CORS)
+Browsers only let a page on another origin read the API's responses if that origin is listed in `AllowedOrigins` in `Web.config`:
+```xml
+<add key="AllowedOrigins" value="http://localhost:4200" />
+```
+- The default allows the Angular dev server.
+- If the deployed Angular app is served from a different origin than the API, add that origin (scheme, host and port; comma-separated). For example: `http://localhost:4200,https://fuel.example.com`.
+- An app on the same origin as the API needs no entry.
+- `*` allows any origin.
+- Preflights from other origins get `403`, and their responses carry no CORS headers.
 
 ### How to Run
 1. Clone this repository:
