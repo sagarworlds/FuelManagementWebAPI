@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Web.Http;
 using WebAPI.Auth;
 using WebAPI.Data;
@@ -41,11 +42,30 @@ namespace WebAPI.Controllers
             return Ok(users);
         }
 
+        /// <summary>
+        /// Registers a user.
+        /// </summary>
+        /// <returns>200 with the new user; 400 when the email or password is invalid; 409 when the email is taken.</returns>
         [AllowAnonymous]
         [HttpPost]
         public IHttpActionResult Save(User oUser)
-        {            
-            var s = rep.Save(oUser);            
+        {
+            if (oUser == null)
+            {
+                return BadRequest("Email and password are required.");
+            }
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            if (rep.EmailExists(oUser.Email))
+            {
+                return Content(HttpStatusCode.Conflict, "An account with this email already exists.");
+            }
+
+            oUser.CreatedAt = DateTime.UtcNow;
+            oUser.ModifiedAt = oUser.CreatedAt;
+            var s = rep.Save(oUser);
             return Ok(s);
         }
 

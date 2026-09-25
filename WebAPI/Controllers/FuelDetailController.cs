@@ -78,7 +78,7 @@ namespace WebAPI.Controllers
         /// <summary>
         /// Stores an entry for the signed-in user.
         /// </summary>
-        /// <returns>200 with the stored entry, or 400 without a body.</returns>
+        /// <returns>200 with the stored entry, or 400 without a body or with invalid values.</returns>
         [HttpPost]
         public IHttpActionResult Save(FuelDetail oFuelDetail)
         {
@@ -86,11 +86,16 @@ namespace WebAPI.Controllers
             {
                 return BadRequest("A fuel detail is required.");
             }
+            // Also catches values the JSON couldn't be read into (e.g. text for a number),
+            // which would otherwise be stored as 0.
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
             // The owner comes from the bearer token, never from the request body.
             oFuelDetail.UserId = User.GetUserId();
-            ///oFuelDetail.CreatedAt = DateTime.UtcNow;
-            oFuelDetail.ModifiedAt = oFuelDetail.CreatedAt;
+            oFuelDetail.ModifiedAt = DateTime.UtcNow;
             var ofuelDetail = rep.Save(oFuelDetail);
             return Ok(ofuelDetail);
         }

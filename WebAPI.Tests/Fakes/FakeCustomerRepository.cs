@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using WebAPI.Data;
@@ -50,6 +51,11 @@ namespace WebAPI.Tests.Fakes
         public User LogIn(User oUser)
         {
             return Users.FirstOrDefault(u => u.Email == oUser.Email && u.Password == oUser.Password);
+        }
+
+        public bool EmailExists(string email)
+        {
+            return Users.Any(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

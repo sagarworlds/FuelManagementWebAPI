@@ -74,7 +74,8 @@ Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `J
     "Password": "SecurePassword123"
   }
   ```
-* **Response**: Returns the registered user details including `Id` and timestamps.
+* **Validation**: `Email` must be a valid address; `Password` must be 8–100 characters.
+* **Response**: `200 OK` with the registered user, including `Id` and timestamps (set by the server); `400 Bad Request` with the validation errors; `409 Conflict` if the email is already registered (ignoring letter case).
 
 #### 2. User Login
 * **URL**: `POST api/user/login`
@@ -106,6 +107,8 @@ Requests without a valid, unexpired token get `401 Unauthorized`. Tokens last `J
 
 All fuel endpoints require a token and act on the signed-in user's entries only.
 
+**Dates are UTC.** Send ISO-8601 with an offset (e.g. `2026-07-09T12:00:00Z` or `2026-07-09T17:30:00+05:30`); the API converts it to UTC, and a value without an offset is taken as UTC. Responses always end in `Z`.
+
 #### 1. Save Fuel Log
 * **URL**: `POST api/fueldetail/save`
 * **Headers**: `Content-Type: application/json`
@@ -120,7 +123,8 @@ All fuel endpoints require a token and act on the signed-in user's entries only.
     "CreatedAt": "2026-07-09T12:00:00Z"
   }
   ```
-* **Response**: Returns the created fuel log entry. `UserId` is always taken from the token; a `UserId` in the body is ignored.
+* **Validation**: `MeterReading` must be a positive whole number; `TotalPrice` and `AddedFuel` must be greater than 0; `CreatedAt` is required and can't be in the future; `Note` is at most 1000 characters. Invalid values, including text where a number is expected, return `400 Bad Request` with the errors.
+* **Response**: Returns the created fuel log entry. `UserId` is always taken from the token and `ModifiedAt` is set by the server; values for them in the body are ignored.
 
 #### 2. Get Fuel Logs by User ID
 * **URL**: `GET api/fueldetail/getbyuserid?userid={UserId}`

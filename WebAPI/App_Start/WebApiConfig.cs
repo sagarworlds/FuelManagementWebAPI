@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Web.Http;
+using Newtonsoft.Json;
 using System.Web.Http.Dispatcher;
 using WebAPI.Auth;
 using WebAPI.Data;
@@ -46,6 +47,11 @@ namespace WebAPI
 
 
             config.MessageHandlers.Add(new CrossDomainHandler());
+
+            // Dates are UTC end to end: incoming values with an offset are converted to UTC, values
+            // without one are taken as UTC, and responses always carry a "Z" so clients parse them
+            // as instants rather than as their own local time.
+            config.Formatters.JsonFormatter.SerializerSettings.DateTimeZoneHandling = DateTimeZoneHandling.Utc;
 
             // Every action requires a valid bearer token unless it is marked [AllowAnonymous].
             config.Filters.Add(new JwtAuthenticationFilter(tokenService));

@@ -92,6 +92,16 @@ namespace WebAPI.Data
             }
         }
 
+        public bool EmailExists(string email)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                return cnn.ExecuteScalar<long>(
+                    "SELECT COUNT(1) FROM User WHERE Email = @email COLLATE NOCASE", new { email }) > 0;
+            }
+        }
+
         public FuelDetail[] GetListFuelDetail()
         {
             using (var cnn = SimpleDbConnection())

@@ -12,5 +12,8 @@ namespace WebAPI.Data
         FuelDetail Save(FuelDetail oFuelDetails);
         User Save(User oUser);
         User LogIn(User oUser);
+
+        /// <summary>Whether a user with this email exists, ignoring letter case.</summary>
+        bool EmailExists(string email);
     }
 }

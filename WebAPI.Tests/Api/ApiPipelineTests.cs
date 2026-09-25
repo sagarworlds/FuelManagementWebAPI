@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Newtonsoft.Json.Linq;
@@ -33,7 +34,8 @@ namespace WebAPI.Tests.Api
             repository = new FakeCustomerRepository();
             repository.Users.Add(new User { Id = 1, Email = "one@example.com", Password = "password-one" });
             repository.Users.Add(new User { Id = 2, Email = "two@example.com", Password = "password-two" });
-            repository.FuelDetails.Add(new FuelDetail { Id = 10, UserId = 1, MeterReading = 1000, TotalPrice = 500, AddedFuel = 5 });
+            // Unspecified kind, as the old SQLite connection returned dates.
+            repository.FuelDetails.Add(new FuelDetail { Id = 10, UserId = 1, MeterReading = 1000, TotalPrice = 500, AddedFuel = 5, CreatedAt = new DateTime(2026, 1, 15, 8, 30, 0, DateTimeKind.Unspecified) });
             repository.FuelDetails.Add(new FuelDetail { Id = 20, UserId = 2, MeterReading = 2000, TotalPrice = 900, AddedFuel = 9 });
 
             tokenService = new JwtTokenService(Secret, TimeSpan.FromHours(1));
@@ -111,7 +113,7 @@ namespace WebAPI.Tests.Api
         {
             var request = Request(HttpMethod.Post, "api/FuelDetail/Save", 1);
             request.Content = new ObjectContent<FuelDetail>(
-                new FuelDetail { UserId = 2, MeterReading = 1100, TotalPrice = 600, AddedFuel = 6 },
+                new FuelDetail { UserId = 2, MeterReading = 1100, TotalPrice = 600, AddedFuel = 6, CreatedAt = DateTime.UtcNow.Date },
                 new System.Net.Http.Formatting.JsonMediaTypeFormatter());
 
             var response = await client.SendAsync(request);
@@ -192,6 +194,120 @@ namespace WebAPI.Tests.Api
             // Without this header the browser hides the 401 from the app, which then can't redirect to login.
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
             Assert.That(response.Headers.GetValues("Access-Control-Allow-Origin").Single(), Is.EqualTo("http://localhost:4200"));
+        }
+
+        [Test]
+        public async Task Save_WithNonPositiveValues_IsBadRequest()
+        {
+            var response = await client.SendAsync(JsonRequest(HttpMethod.Post, "api/FuelDetail/Save",
+                "{\"MeterReading\":0,\"TotalPrice\":-1,\"AddedFuel\":0,\"CreatedAt\":\"2026-01-15T00:00:00Z\"}", 1));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.That(body, Does.Contain("MeterReading must be a positive whole number."));
+            Assert.That(body, Does.Contain("TotalPrice must be greater than 0."));
+            Assert.That(body, Does.Contain("AddedFuel must be greater than 0."));
+            Assert.That(repository.FuelDetails.Count, Is.EqualTo(2), "Nothing may be saved.");
+        }
+
+        [Test]
+        public async Task Save_WithTextForANumber_IsBadRequest_InsteadOfStoringZero()
+        {
+            var response = await client.SendAsync(JsonRequest(HttpMethod.Post, "api/FuelDetail/Save",
+                "{\"MeterReading\":\"abc\",\"TotalPrice\":500,\"AddedFuel\":5,\"CreatedAt\":\"2026-01-15T00:00:00Z\"}", 1));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(repository.FuelDetails.Count, Is.EqualTo(2), "Nothing may be saved.");
+        }
+
+        [Test]
+        public async Task Save_WithoutCreatedAt_IsBadRequest()
+        {
+            var response = await client.SendAsync(JsonRequest(HttpMethod.Post, "api/FuelDetail/Save",
+                "{\"MeterReading\":1100,\"TotalPrice\":500,\"AddedFuel\":5}", 1));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("CreatedAt is required."));
+        }
+
+        [Test]
+        public async Task Save_WithFutureCreatedAt_IsBadRequest()
+        {
+            var future = DateTime.UtcNow.AddDays(3).ToString("o");
+            var response = await client.SendAsync(JsonRequest(HttpMethod.Post, "api/FuelDetail/Save",
+                "{\"MeterReading\":1100,\"TotalPrice\":500,\"AddedFuel\":5,\"CreatedAt\":\"" + future + "\"}", 1));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("CreatedAt cannot be in the future."));
+        }
+
+        [Test]
+        public async Task Save_StoresCreatedAtInUtc_AndSetsModifiedAtOnTheServer()
+        {
+            var response = await client.SendAsync(JsonRequest(HttpMethod.Post, "api/FuelDetail/Save",
+                "{\"MeterReading\":1100,\"TotalPrice\":500,\"AddedFuel\":5,\"CreatedAt\":\"2026-01-15T00:00:00+05:30\",\"ModifiedAt\":\"2000-01-01T00:00:00Z\"}", 1));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            var saved = repository.FuelDetails.Last();
+            Assert.That(saved.CreatedAt, Is.EqualTo(new DateTime(2026, 1, 14, 18, 30, 0, DateTimeKind.Utc)));
+            Assert.That(saved.CreatedAt.Kind, Is.EqualTo(DateTimeKind.Utc));
+            Assert.That(saved.ModifiedAt, Is.EqualTo(DateTime.UtcNow).Within(TimeSpan.FromMinutes(1)));
+        }
+
+        [Test]
+        public async Task ResponseDates_AreMarkedAsUtc()
+        {
+            var response = await client.SendAsync(Request(HttpMethod.Get, "api/FuelDetail/Get", 1));
+
+            Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("\"CreatedAt\":\"2026-01-15T08:30:00Z\""));
+        }
+
+        [TestCase("not-an-email", "long-enough-password", "Email must be a valid email address.")]
+        [TestCase("new@example.com", "short", "Password must be 8 to 100 characters.")]
+        [TestCase("", "long-enough-password", "Email is required.")]
+        public async Task Register_WithInvalidCredentials_IsBadRequest(string email, string password, string message)
+        {
+            var response = await client.SendAsync(RegisterRequest(email, password));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain(message));
+            Assert.That(repository.Users.Count, Is.EqualTo(2), "Nobody may be registered.");
+        }
+
+        [Test]
+        public async Task Register_WithTakenEmail_IsConflict_IgnoringCase()
+        {
+            var response = await client.SendAsync(RegisterRequest("ONE@example.com", "another-password"));
+
+            Assert.That(response.StatusCode, Is.EqualTo((HttpStatusCode)409));
+            Assert.That(repository.Users.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public async Task Register_SetsTheCreationTimeOnTheServer()
+        {
+            var response = await client.SendAsync(RegisterRequest("new@example.com", "long-enough-password"));
+
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            var user = repository.Users.Last();
+            Assert.That(user.CreatedAt, Is.EqualTo(DateTime.UtcNow).Within(TimeSpan.FromMinutes(1)));
+            Assert.That(user.ModifiedAt, Is.EqualTo(user.CreatedAt));
+        }
+
+        private HttpRequestMessage JsonRequest(HttpMethod method, string path, string json, int? userId = null)
+        {
+            var request = Request(method, path, userId);
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            return request;
+        }
+
+        private HttpRequestMessage RegisterRequest(string email, string password)
+        {
+            var request = Request(HttpMethod.Post, "api/User/Save");
+            request.Content = new ObjectContent<User>(
+                new User { Email = email, Password = password },
+                new System.Net.Http.Formatting.JsonMediaTypeFormatter());
+            return request;
         }
 
         private HttpRequestMessage Request(HttpMethod method, string path, int? userId = null)
