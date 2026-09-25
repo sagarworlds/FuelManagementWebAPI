@@ -135,7 +135,7 @@ var emptyTestClientModel =
             width: "700",
             modal: true,
             open: function () {
-                jQuery('.ui-widget-overlay').bind('click', function () {
+                jQuery('.ui-widget-overlay').on('click', function () {
                     jQuery('#testClientDialog').dialog('close');
                 })
             },
@@ -152,13 +152,13 @@ var emptyTestClientModel =
             width: "550",
             modal: true,
             open: function () {
-                jQuery('.ui-widget-overlay').bind('click', function () {
+                jQuery('.ui-widget-overlay').on('click', function () {
                     jQuery('#testClientResponseDialog').dialog('close');
                 })
             }
         });
 
-        $("#testClientButton").click(function () {
+        $("#testClientButton").on("click", function () {
             $("#testClientDialog").dialog("open");
         });
     }
