@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Globalization;
-using System.IdentityModel;
-using System.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace WebAPI.Auth
 {
@@ -86,10 +86,7 @@ namespace WebAPI.Auth
 
             var issuedAt = utcNow();
             var expiresAt = issuedAt.Add(lifetime);
-            var credentials = new SigningCredentials(
-                new InMemorySymmetricSecurityKey(key),
-                SecurityAlgorithms.HmacSha256Signature,
-                SecurityAlgorithms.Sha256Digest);
+            var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)),
@@ -112,7 +109,7 @@ namespace WebAPI.Auth
             {
                 ValidIssuer = Issuer,
                 ValidAudience = Issuer,
-                IssuerSigningKey = new InMemorySymmetricSecurityKey(key),
+                IssuerSigningKey = new SymmetricSecurityKey(key),
                 // The same server issues and validates tokens, so there is no clock drift to allow for.
                 ClockSkew = TimeSpan.Zero
             };
@@ -123,15 +120,10 @@ namespace WebAPI.Auth
                 SecurityToken validatedToken;
                 principal = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out validatedToken);
             }
-            catch (SignatureVerificationFailedException ex)
-            {
-                // Signed with another key or altered. Only the type is logged: the messages echo the token.
-                Trace.TraceWarning("Rejected bearer token: {0}", ex.GetType().Name);
-                return null;
-            }
             catch (SecurityTokenException ex)
             {
-                // Expired, not yet valid, unsigned, or wrong issuer/audience.
+                // Bad or missing signature, expired, not yet valid, or wrong issuer/audience.
+                // Only the type is logged: the messages can echo parts of the token.
                 Trace.TraceWarning("Rejected bearer token: {0}", ex.GetType().Name);
                 return null;
             }
