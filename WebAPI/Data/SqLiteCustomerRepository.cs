@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using Dapper;
 using WebAPI.Model;
@@ -81,14 +82,42 @@ namespace WebAPI.Data
 
         }
 
-        public User LogIn(User oUser)
+        public User GetUserByEmail(string email)
         {
             using (var cnn = SimpleDbConnection())
             {
                 cnn.Open();
-                //var result = cnn.Query<User>("SELECT Id, Email, Password, CreatedAt, ModifiedAt FROM User WHERE Email=@email AND Password=@password", new { email = oUser.Email, password = oUser.Password }).FirstOrDefault();
-                var result = cnn.Query<User>("SELECT * FROM User WHERE Email=@email AND Password=@password", new { email = oUser.Email, password = oUser.Password }).FirstOrDefault();
-                return result;
+                return cnn.Query<User>("SELECT * FROM User WHERE Email = @email COLLATE NOCASE ORDER BY Id", new { email }).FirstOrDefault();
+            }
+        }
+
+        public User GetUserById(int id)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                return cnn.Query<User>("SELECT * FROM User WHERE Id = @id", new { id }).FirstOrDefault();
+            }
+        }
+
+        public void UpdatePassword(int userId, string passwordHash, DateTime modifiedAt)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                cnn.Execute(
+                    "UPDATE User SET Password = @passwordHash, ModifiedAt = @modifiedAt WHERE Id = @userId",
+                    new { userId, passwordHash, modifiedAt });
+            }
+        }
+
+        public bool EmailExists(string email)
+        {
+            using (var cnn = SimpleDbConnection())
+            {
+                cnn.Open();
+                return cnn.ExecuteScalar<long>(
+                    "SELECT COUNT(1) FROM User WHERE Email = @email COLLATE NOCASE", new { email }) > 0;
             }
         }
 

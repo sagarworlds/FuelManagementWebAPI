@@ -17,7 +17,9 @@ namespace WebAPI.Data
         public static SQLiteConnection SimpleDbConnection()
         {
 
-            return new SQLiteConnection("Data Source=" + DbFile);
+            // DateTimeKind=Utc: DateTimes are written with a "Z" and read back as UTC. Without it,
+            // stored "Z" values are converted to the server's local time and returned without an offset.
+            return new SQLiteConnection("Data Source=" + DbFile + ";DateTimeKind=Utc");
         }
     }
 }
